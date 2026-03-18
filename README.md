@@ -17,12 +17,15 @@ A configurable status line for **GitHub Copilot CLI**. Shows model, context usag
 ## Quick Start
 
 ```bash
-npm install -g copilot-hud
-copilot-hud setup
-copilot   # status bar appears at the bottom!
-```
+# Install from GitHub
+npm install -g github:ChristLZS/copilot-hud
 
-Three commands. That's it.
+# Configure as Copilot's status line
+copilot-hud setup
+
+# Launch Copilot — status bar appears at the bottom!
+copilot
+```
 
 ## How It Works
 

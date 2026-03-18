@@ -17,12 +17,15 @@
 ## 快速开始
 
 ```bash
-npm install -g copilot-hud
-copilot-hud setup
-copilot   # 状态栏会自动出现在底部！
-```
+# 从 GitHub 安装
+npm install -g github:ChristLZS/copilot-hud
 
-三条命令，搞定。
+# 配置为 Copilot 的状态栏
+copilot-hud setup
+
+# 启动 Copilot —— 状态栏自动出现在底部！
+copilot
+```
 
 ## 工作原理
 

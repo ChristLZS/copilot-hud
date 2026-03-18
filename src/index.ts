@@ -82,7 +82,7 @@ function printHelp(): void {
   console.log("");
   console.log(bold("  Quick Start:"));
   console.log("");
-  console.log("    " + dim("$") + " npm install -g copilot-hud");
+  console.log("    " + dim("$") + " npm install -g github:ChristLZS/copilot-hud");
   console.log("    " + dim("$") + " copilot-hud setup");
   console.log("    " + dim("$") + " copilot  " + dim("← status bar appears at the bottom!"));
   console.log("");
