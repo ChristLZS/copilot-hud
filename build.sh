@@ -7,4 +7,11 @@ npm install
 echo "Building TypeScript..."
 npx tsc
 
-echo "Build complete! Run with: node dist/index.js"
+echo ""
+echo "Build complete!"
+echo ""
+echo "To install globally:"
+echo "  npm link"
+echo ""
+echo "To set up shell integration:"
+echo "  copilot-hud setup"

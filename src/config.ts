@@ -8,6 +8,11 @@ const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
 const PRESETS: Record<string, Partial<HudConfig["show"]>> = {
   full: {
+    model: true,
+    contextWindow: true,
+    contextBar: true,
+    cost: true,
+    linesChanged: true,
     git: true,
     gitBranch: true,
     gitDirty: true,
@@ -15,15 +20,17 @@ const PRESETS: Record<string, Partial<HudConfig["show"]>> = {
     gitFileStats: true,
     project: true,
     projectDepth: 2,
-    nodeVersion: true,
     system: true,
-    cpuUsage: true,
     memoryUsage: true,
     time: true,
-    copilotStatus: true,
     separator: true,
   },
   essential: {
+    model: true,
+    contextWindow: true,
+    contextBar: true,
+    cost: false,
+    linesChanged: true,
     git: true,
     gitBranch: true,
     gitDirty: true,
@@ -31,15 +38,17 @@ const PRESETS: Record<string, Partial<HudConfig["show"]>> = {
     gitFileStats: false,
     project: true,
     projectDepth: 1,
-    nodeVersion: false,
     system: false,
-    cpuUsage: false,
-    memoryUsage: true,
+    memoryUsage: false,
     time: true,
-    copilotStatus: true,
     separator: true,
   },
   minimal: {
+    model: true,
+    contextWindow: true,
+    contextBar: false,
+    cost: false,
+    linesChanged: false,
     git: true,
     gitBranch: true,
     gitDirty: true,
@@ -47,36 +56,17 @@ const PRESETS: Record<string, Partial<HudConfig["show"]>> = {
     gitFileStats: false,
     project: false,
     projectDepth: 1,
-    nodeVersion: false,
     system: false,
-    cpuUsage: false,
     memoryUsage: false,
     time: false,
-    copilotStatus: false,
-    separator: false,
+    separator: true,
   },
 };
 
 export function getDefaultConfig(): HudConfig {
   return {
-    layout: "compact",
     preset: "full",
-    show: {
-      git: true,
-      gitBranch: true,
-      gitDirty: true,
-      gitAheadBehind: true,
-      gitFileStats: true,
-      project: true,
-      projectDepth: 2,
-      nodeVersion: true,
-      system: true,
-      cpuUsage: true,
-      memoryUsage: true,
-      time: true,
-      copilotStatus: true,
-      separator: true,
-    },
+    show: { ...PRESETS.full } as HudConfig["show"],
     colors: {
       branch: "brightCyan",
       project: "brightBlue",
@@ -88,7 +78,6 @@ export function getDefaultConfig(): HudConfig {
       muted: "gray",
     },
     separatorChar: " │ ",
-    refreshInterval: 2000,
   };
 }
 
@@ -103,45 +92,20 @@ export function loadConfig(): HudConfig {
     const raw = readFileSync(CONFIG_FILE, "utf-8");
     const userConfig = JSON.parse(raw) as Partial<HudConfig>;
 
-    const merged: HudConfig = {
+    const presetName = userConfig.preset || defaults.preset;
+    const presetShow = PRESETS[presetName] || PRESETS.full;
+
+    return {
       ...defaults,
       ...userConfig,
-      show: { ...defaults.show, ...(userConfig.show || {}) },
+      show: { ...defaults.show, ...presetShow, ...(userConfig.show || {}) },
       colors: { ...defaults.colors, ...(userConfig.colors || {}) },
     };
-
-    // Apply preset overrides if preset changed
-    if (userConfig.preset && PRESETS[userConfig.preset]) {
-      const presetShow = PRESETS[userConfig.preset];
-      merged.show = { ...merged.show, ...presetShow };
-      // Re-apply any explicit user show overrides on top
-      if (userConfig.show) {
-        merged.show = { ...merged.show, ...userConfig.show };
-      }
-    }
-
-    return merged;
   } catch {
     return defaults;
   }
 }
 
-export function saveConfig(config: Partial<HudConfig> & Pick<HudConfig, "preset" | "layout">): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  // Load existing raw config to merge
-  let existing: Record<string, unknown> = {};
-  if (existsSync(CONFIG_FILE)) {
-    try {
-      existing = JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
-    } catch { /* ignore */ }
-  }
-  const merged = { ...existing, ...config };
-  writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), "utf-8");
-}
-
-/** Save only specific fields without full config dump */
 export function savePartialConfig(partial: Partial<HudConfig>): void {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
@@ -153,11 +117,17 @@ export function savePartialConfig(partial: Partial<HudConfig>): void {
     } catch { /* ignore */ }
   }
   const merged = { ...existing, ...partial };
-  // When setting preset, remove show overrides so preset takes effect cleanly
   if (partial.preset && !partial.show) {
     delete merged.show;
   }
   writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), "utf-8");
+}
+
+export function saveFullConfig(config: HudConfig): void {
+  if (!existsSync(CONFIG_DIR)) {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+  }
+  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
 }
 
 export function getConfigPath(): string {

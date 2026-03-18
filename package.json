@@ -1,19 +1,38 @@
 {
   "name": "copilot-hud",
   "version": "1.0.0",
-  "description": "A configurable terminal HUD for GitHub Copilot CLI",
+  "description": "A configurable terminal HUD for GitHub Copilot CLI — shows git, system, and copilot status at a glance",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "copilot-hud": "dist/index.js"
   },
+  "files": [
+    "dist/"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": ["copilot", "hud", "terminal", "statusline", "cli"],
+  "keywords": [
+    "copilot",
+    "github-copilot",
+    "hud",
+    "terminal",
+    "statusline",
+    "cli",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anthropics/copilot-hud.git"
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.5.0"

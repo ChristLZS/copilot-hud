@@ -1,131 +1,182 @@
 #!/usr/bin/env node
 
-import { loadConfig, saveConfig, savePartialConfig, getDefaultConfig, getConfigPath } from "./config.js";
+import { loadConfig, savePartialConfig, saveFullConfig, getDefaultConfig, getConfigPath } from "./config.js";
 import { getGitInfo } from "./git.js";
 import { getSystemInfo } from "./system.js";
-import { getCopilotInfo } from "./copilot.js";
-import { render } from "./render.js";
+import { readStdin } from "./stdin.js";
+import { renderStatusLine } from "./render.js";
+import { setupCopilotStatusLine, uninstallCopilotStatusLine } from "./setup.js";
+import { colorBold, dim, bold, color } from "./colors.js";
 import type { RenderContext } from "./types.js";
 
 function getTerminalWidth(): number {
   return process.stdout.columns || 80;
 }
 
-function printHud(): void {
+/**
+ * Main statusline mode: read stdin from Copilot CLI, output formatted status.
+ * This is what Copilot CLI calls periodically.
+ */
+async function runStatusLine(): Promise<void> {
   const config = loadConfig();
-  const git = getGitInfo();
+  const stdinData = await readStdin();
+  const projectPath = stdinData.cwd || process.cwd();
+  const git = getGitInfo(projectPath);
   const system = getSystemInfo();
-  const copilot = getCopilotInfo();
-  const projectPath = process.cwd();
 
   const ctx: RenderContext = {
+    stdin: stdinData,
     git,
     system,
-    copilot,
     projectPath,
     terminalWidth: getTerminalWidth(),
     config,
   };
 
-  const output = render(ctx);
-  process.stdout.write("\x1b[0m" + output + "\x1b[0m\n");
+  const output = renderStatusLine(ctx);
+  process.stdout.write("\x1b[0m" + output + "\x1b[0m");
+}
+
+/** Preview mode: show what the status line would look like */
+function printPreview(): void {
+  const config = loadConfig();
+  const git = getGitInfo(process.cwd());
+  const system = getSystemInfo();
+
+  // Simulate stdin data for preview
+  const mockStdin = {
+    cwd: process.cwd(),
+    model: { display_name: "Claude Sonnet 4" },
+    context_window: { total_tokens: 200000, used_tokens: 45000, percent_used: 22 },
+    cost: { total_premium_requests: 3, total_lines_added: 42, total_lines_removed: 7, total_api_duration_ms: 12300 },
+  };
+
+  const ctx: RenderContext = {
+    stdin: mockStdin,
+    git,
+    system,
+    projectPath: process.cwd(),
+    terminalWidth: getTerminalWidth(),
+    config,
+  };
+
+  console.log("");
+  console.log(colorBold("  Status line preview:", "cyan"));
+  console.log("");
+  console.log("  " + renderStatusLine(ctx));
+  console.log("");
 }
 
 function printHelp(): void {
-  console.log(`
-copilot-hud - A configurable terminal HUD for GitHub Copilot CLI
-
-Usage:
-  copilot-hud              Show HUD once
-  copilot-hud --watch      Watch mode (refresh periodically)
-  copilot-hud --config     Show config file path
-  copilot-hud --init       Create default config file
-  copilot-hud --preset <n> Apply preset (full/essential/minimal)
-  copilot-hud --layout <l> Set layout (compact/expanded)
-  copilot-hud --help       Show this help
-
-Config file: ~/.config/copilot-hud/config.json
-`);
+  console.log("");
+  console.log(colorBold("  Copilot HUD", "cyan") + dim(" — Status line for GitHub Copilot CLI"));
+  console.log("");
+  console.log(bold("  Usage:"));
+  console.log("");
+  console.log("    " + colorBold("copilot-hud setup", "white") + "            Configure as Copilot status line");
+  console.log("    " + colorBold("copilot-hud uninstall", "white") + "        Remove status line config");
+  console.log("    " + colorBold("copilot-hud preview", "white") + "          Preview the status line");
+  console.log("    " + colorBold("copilot-hud config", "white") + "           Show current config");
+  console.log("    " + colorBold("copilot-hud config init", "white") + "      Create default config file");
+  console.log("    " + colorBold("copilot-hud config preset", "white") + dim(" <name>") + "  Apply preset (full/essential/minimal)");
+  console.log("");
+  console.log(bold("  Quick Start:"));
+  console.log("");
+  console.log("    " + dim("$") + " npm install -g copilot-hud");
+  console.log("    " + dim("$") + " copilot-hud setup");
+  console.log("    " + dim("$") + " copilot  " + dim("← status bar appears at the bottom!"));
+  console.log("");
+  console.log(dim("  Config: ~/.config/copilot-hud/config.json"));
+  console.log("");
 }
 
-function handleArgs(): void {
-  const args = process.argv.slice(2);
+function handleConfig(args: string[]): void {
+  const sub = args[0];
 
-  if (args.includes("--help") || args.includes("-h")) {
+  if (!sub) {
+    console.log("");
+    console.log(colorBold("  Current config", "cyan") + dim(` (${getConfigPath()})`));
+    console.log("");
+    const config = loadConfig();
+    const json = JSON.stringify(config, null, 2);
+    for (const line of json.split("\n")) {
+      console.log("  " + line);
+    }
+    console.log("");
+    return;
+  }
+
+  if (sub === "init") {
+    saveFullConfig(getDefaultConfig());
+    console.log("");
+    console.log(color("  ✓", "brightGreen") + ` Config created at ${dim(getConfigPath())}`);
+    console.log(dim("  Edit it to customize your status line."));
+    console.log("");
+    return;
+  }
+
+  if (sub === "preset") {
+    const preset = args[1] as "full" | "essential" | "minimal";
+    if (!preset || !["full", "essential", "minimal"].includes(preset)) {
+      console.error("  Usage: copilot-hud config preset <full|essential|minimal>");
+      process.exit(1);
+    }
+    savePartialConfig({ preset });
+    console.log("");
+    console.log(color("  ✓", "brightGreen") + ` Preset set to ${colorBold(preset, "cyan")}`);
+    console.log("");
+    printPreview();
+    return;
+  }
+
+  console.error(`  Unknown config command: ${sub}`);
+  process.exit(1);
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const cmd = args[0];
+
+  // No args + stdin is piped = Copilot CLI is calling us as status line
+  if (!cmd && !process.stdin.isTTY) {
+    await runStatusLine();
+    return;
+  }
+
+  // No args + interactive terminal = show help
+  if (!cmd) {
     printHelp();
     return;
   }
 
-  if (args.includes("--config")) {
-    console.log(`Config path: ${getConfigPath()}`);
-    const config = loadConfig();
-    console.log(JSON.stringify(config, null, 2));
+  if (cmd === "--help" || cmd === "-h" || cmd === "help") {
+    printHelp();
     return;
   }
 
-  if (args.includes("--init")) {
-    const config = getDefaultConfig();
-    saveConfig(config);
-    console.log(`Config created at: ${getConfigPath()}`);
+  if (cmd === "setup") {
+    setupCopilotStatusLine();
     return;
   }
 
-  const presetIdx = args.indexOf("--preset");
-  if (presetIdx !== -1 && args[presetIdx + 1]) {
-    const preset = args[presetIdx + 1] as "full" | "essential" | "minimal";
-    if (!["full", "essential", "minimal"].includes(preset)) {
-      console.error("Invalid preset. Choose: full, essential, minimal");
-      process.exit(1);
-    }
-    savePartialConfig({ preset });
-    console.log(`Preset set to: ${preset}`);
+  if (cmd === "uninstall") {
+    uninstallCopilotStatusLine();
     return;
   }
 
-  const layoutIdx = args.indexOf("--layout");
-  if (layoutIdx !== -1 && args[layoutIdx + 1]) {
-    const layout = args[layoutIdx + 1] as "compact" | "expanded";
-    if (!["compact", "expanded"].includes(layout)) {
-      console.error("Invalid layout. Choose: compact, expanded");
-      process.exit(1);
-    }
-    savePartialConfig({ layout });
-    console.log(`Layout set to: ${layout}`);
+  if (cmd === "preview") {
+    printPreview();
     return;
   }
 
-  if (args.includes("--watch") || args.includes("-w")) {
-    const config = loadConfig();
-    const interval = config.refreshInterval || 2000;
-
-    // Clear screen and hide cursor
-    process.stdout.write("\x1b[?25l");
-
-    const refresh = () => {
-      // Move cursor to bottom
-      const rows = process.stdout.rows || 24;
-      process.stdout.write(`\x1b[${rows};1H`);
-      process.stdout.write("\x1b[2K"); // Clear line
-      printHud();
-    };
-
-    refresh();
-    const timer = setInterval(refresh, interval);
-
-    // Cleanup on exit
-    const cleanup = () => {
-      clearInterval(timer);
-      process.stdout.write("\x1b[?25h"); // Show cursor
-      process.exit(0);
-    };
-
-    process.on("SIGINT", cleanup);
-    process.on("SIGTERM", cleanup);
+  if (cmd === "config") {
+    handleConfig(args.slice(1));
     return;
   }
 
-  // Default: print once
-  printHud();
+  console.error(`Unknown command: ${cmd}`);
+  console.error("Run copilot-hud --help for usage.");
+  process.exit(1);
 }
 
-handleArgs();
+main();

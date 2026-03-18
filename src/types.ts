@@ -1,13 +1,15 @@
 /** HUD configuration */
 export interface HudConfig {
-  /** Layout mode: compact (single line) or expanded (multi-line) */
-  layout: "compact" | "expanded";
-
   /** Display preset: full / essential / minimal */
   preset: "full" | "essential" | "minimal";
 
   /** Individual display toggles */
   show: {
+    model: boolean;
+    contextWindow: boolean;
+    contextBar: boolean;
+    cost: boolean;
+    linesChanged: boolean;
     git: boolean;
     gitBranch: boolean;
     gitDirty: boolean;
@@ -15,12 +17,9 @@ export interface HudConfig {
     gitFileStats: boolean;
     project: boolean;
     projectDepth: number;
-    nodeVersion: boolean;
     system: boolean;
-    cpuUsage: boolean;
     memoryUsage: boolean;
     time: boolean;
-    copilotStatus: boolean;
     separator: boolean;
   };
 
@@ -38,9 +37,6 @@ export interface HudConfig {
 
   /** Separator character between sections */
   separatorChar: string;
-
-  /** Refresh interval in milliseconds (for watch mode) */
-  refreshInterval: number;
 }
 
 export type AnsiColor =
@@ -59,6 +55,31 @@ export type AnsiColor =
   | "brightMagenta"
   | "brightCyan";
 
+/** JSON data received from Copilot CLI via stdin */
+export interface CopilotStdinData {
+  cwd?: string;
+  session_id?: string;
+  model?: {
+    id?: string;
+    display_name?: string;
+  };
+  cost?: {
+    total_premium_requests?: number;
+    total_lines_added?: number;
+    total_lines_removed?: number;
+    total_api_duration_ms?: number;
+  };
+  context_window?: {
+    total_tokens?: number;
+    used_tokens?: number;
+    available_tokens?: number;
+    percent_used?: number;
+  };
+  workspace?: string;
+  version?: string;
+  transcript_path?: string;
+}
+
 export interface GitInfo {
   branch: string;
   dirty: boolean;
@@ -71,24 +92,15 @@ export interface GitInfo {
 }
 
 export interface SystemInfo {
-  cpuUsage: number;
   memoryUsed: number;
   memoryTotal: number;
   memoryPercent: number;
-  platform: string;
-  nodeVersion: string;
-}
-
-export interface CopilotInfo {
-  installed: boolean;
-  authenticated: boolean;
-  version: string;
 }
 
 export interface RenderContext {
+  stdin: CopilotStdinData;
   git: GitInfo | null;
   system: SystemInfo;
-  copilot: CopilotInfo | null;
   projectPath: string;
   terminalWidth: number;
   config: HudConfig;
