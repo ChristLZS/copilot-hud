@@ -1,0 +1,21 @@
+{
+  "name": "copilot-hud",
+  "version": "1.0.0",
+  "description": "A configurable terminal HUD for GitHub Copilot CLI",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "copilot-hud": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "keywords": ["copilot", "hud", "terminal", "statusline", "cli"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0"
+  }
+}
